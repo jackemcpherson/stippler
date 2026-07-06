@@ -1,0 +1,6 @@
+photos/
+cutouts/
+models/
+preview/
+.venv/
+__pycache__/
