@@ -7,6 +7,8 @@ import { resizeGray, resizeRgb } from "./image";
 export interface MatteSession {
   /** Predict a [0, 1] foreground matte at the image's original size. */
   alphaMatte(im: RgbImage): Promise<Float64Array>;
+  /** Free the native onnxruntime session. */
+  release(): Promise<void>;
 }
 
 /**
@@ -66,6 +68,9 @@ export async function createMatteSession(modelPath: string): Promise<MatteSessio
         if (cause instanceof StipplerError) throw cause;
         throw new StipplerError("MATTE_FAILED", "u2net inference failed", { cause });
       }
+    },
+    async release(): Promise<void> {
+      await session.release();
     },
   };
 }

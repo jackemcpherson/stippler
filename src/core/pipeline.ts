@@ -70,7 +70,15 @@ export async function generateHedcut(
 ): Promise<Result<HedcutOutput, StipplerError>> {
   const resolved = resolveOptions(options);
   const modelPath = options.modelPath;
-  // Warm the ONNX session while the image decodes — model load dominates startup.
+  if (resolved.cutout && modelPath === undefined) {
+    return err(
+      new StipplerError(
+        "MODEL_NOT_FOUND",
+        "background removal needs options.modelPath — the library never downloads the model",
+      ),
+    );
+  }
+  // Warm the ONNX session while the image decodes; released in the finally.
   const sessionPromise =
     resolved.cutout && modelPath !== undefined
       ? import("../infra/matte").then((m) => m.createMatteSession(modelPath))
@@ -84,15 +92,7 @@ export async function generateHedcut(
     }
 
     let framed: RgbImage;
-    if (resolved.cutout) {
-      if (sessionPromise === undefined) {
-        return err(
-          new StipplerError(
-            "MODEL_NOT_FOUND",
-            "background removal needs options.modelPath — the library never downloads the model",
-          ),
-        );
-      }
+    if (sessionPromise !== undefined) {
       const session = await sessionPromise;
       const matte = await session.alphaMatte(rgb);
       const composited = compositeOnWhite(rgb, matte);
@@ -132,5 +132,9 @@ export async function generateHedcut(
       return err(error);
     }
     throw error;
+  } finally {
+    // Release the native session on every path, even when a failure races
+    // the still-loading warm-up.
+    void sessionPromise?.then((session) => session.release()).catch(() => {});
   }
 }

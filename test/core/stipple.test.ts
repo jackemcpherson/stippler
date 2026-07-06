@@ -99,6 +99,12 @@ describe("stipple", () => {
     );
   });
 
+  it("returns an empty result for zero requested dots", () => {
+    const result = stipple(uniformDisk(), W, H, 0, 5, createRng(7));
+    expect(result.points.length).toBe(0);
+    expect(result.darkness.length).toBe(0);
+  });
+
   it("degrades gracefully when positive pixels are fewer than requested dots", () => {
     const d = new Float64Array(W * H);
     for (let i = 0; i < 10; i++) d[40 * W + 40 + i] = 1;

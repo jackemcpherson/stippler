@@ -35,6 +35,8 @@ async function fileSize(path: string): Promise<number | undefined> {
 export async function ensureModel(opts: {
   modelPath?: string | undefined;
   onProgress?: (receivedBytes: number, totalBytes: number | null) => void;
+  /** Aborts an in-flight download and cleans up its temp file. */
+  signal?: AbortSignal | undefined;
 }): Promise<Result<string, StipplerError>> {
   if (opts.modelPath !== undefined) {
     const size = await fileSize(opts.modelPath);
@@ -58,7 +60,7 @@ export async function ensureModel(opts: {
   const temp = `${target}.download-${process.pid}`;
   try {
     await mkdir(dirname(target), { recursive: true });
-    const response = await fetch(MODEL_URL);
+    const response = await fetch(MODEL_URL, { signal: opts.signal ?? null });
     if (!response.ok || response.body === null) {
       return err(
         new StipplerError(
@@ -81,6 +83,7 @@ export async function ensureModel(opts: {
       Readable.fromWeb(response.body as import("node:stream/web").ReadableStream),
       progress,
       createWriteStream(temp),
+      opts.signal !== undefined ? { signal: opts.signal } : {},
     );
     const downloaded = await fileSize(temp);
     if (downloaded === undefined || downloaded < MODEL_SIZE_MIN) {

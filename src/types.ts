@@ -15,7 +15,7 @@ export const CANVAS_HEIGHT = 432;
  * Fractional crop box applied when background removal is disabled and no
  * explicit crop is given: a top-centre bust framing.
  */
-export const DEFAULT_CROP: CropBox = { x0: 0.125, y0: 0.02, x1: 0.875, y1: 0.92 };
+export const DEFAULT_CROP: CropBox = Object.freeze({ x0: 0.125, y0: 0.02, x1: 0.875, y1: 0.92 });
 
 /**
  * Tuned defaults for {@link HedcutOptions} — the single source of truth shared
@@ -29,7 +29,7 @@ export const DEFAULT_OPTIONS: {
   readonly seed: number;
   readonly ink: string;
   readonly cutout: boolean;
-} = {
+} = Object.freeze({
   dots: 2200,
   iters: 45,
   gamma: 1.45,
@@ -37,7 +37,7 @@ export const DEFAULT_OPTIONS: {
   seed: 7,
   ink: "#1a1a1a",
   cutout: true,
-};
+});
 
 /**
  * Fractional crop box in [0, 1] image coordinates.

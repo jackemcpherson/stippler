@@ -50,7 +50,7 @@ export function sampleSeeds(
     cum[i] = running;
   }
   const total = running;
-  const count = Math.min(n, positive);
+  const count = Math.min(Math.max(n, 0), positive);
 
   const taken = new Uint8Array(density.length);
   const indices = new Int32Array(count);
@@ -192,6 +192,7 @@ export function sampleDarkness(
 
 /**
  * Full weighted Voronoi stippling: seed by darkness, relax, threshold.
+ * Requesting zero dots yields an empty result.
  *
  * @throws {StipplerError} EMPTY_DENSITY when the density map has no mass.
  */
@@ -204,7 +205,7 @@ export function stipple(
   rng: Rng,
 ): StippleResult {
   const points = sampleSeeds(density, width, nDots, rng);
-  if (points.length === 0) {
+  if (nDots > 0 && points.length === 0) {
     throw new StipplerError("EMPTY_DENSITY", "density map is empty — image may be blank");
   }
   relax(points, density, width, height, iters);

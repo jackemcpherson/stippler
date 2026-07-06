@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { outputFormat, parseFlags } from "../../src/cli/flags";
+import { DEFAULT_SCALE, parseFlags } from "../../src/cli/flags";
 import { DEFAULT_OPTIONS } from "../../src/types";
 
 describe("parseFlags", () => {
@@ -7,7 +7,7 @@ describe("parseFlags", () => {
     const result = parseFlags({ cutout: true });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data).toMatchObject({ ...DEFAULT_OPTIONS, scale: 2, format: "svg" });
+      expect(result.data).toMatchObject({ ...DEFAULT_OPTIONS, scale: DEFAULT_SCALE });
       expect(result.data.crop).toBeUndefined();
     }
   });
@@ -61,28 +61,5 @@ describe("parseFlags", () => {
   ])("rejects out-of-range %s=%s", (key, value) => {
     const result = parseFlags({ cutout: true, [key]: value });
     expect(result.success).toBe(false);
-  });
-
-  it("rejects unsupported output extensions", () => {
-    const result = parseFlags({ cutout: true, out: "x.webp" });
-    expect(result.success).toBe(false);
-    if (!result.success) expect(result.error.message).toContain("webp");
-  });
-
-  it("accepts .svg and case-insensitive .PNG outputs", () => {
-    expect(parseFlags({ cutout: true, out: "x.svg" }).success).toBe(true);
-    expect(parseFlags({ cutout: true, out: "x.PNG" }).success).toBe(true);
-  });
-});
-
-describe("outputFormat", () => {
-  it("defaults to svg when no path is given", () => {
-    const result = outputFormat(undefined);
-    expect(result.success && result.data).toBe("svg");
-  });
-
-  it("infers png case-insensitively", () => {
-    const result = outputFormat("out.PNG");
-    expect(result.success && result.data).toBe("png");
   });
 });

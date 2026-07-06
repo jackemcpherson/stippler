@@ -24,6 +24,9 @@ const cropSchema = z.string().transform((s, ctx): CropBox => {
   return { x0, y0, x1, y1 };
 });
 
+/** Default PNG scale factor over the canvas size. CLI-only knob. */
+export const DEFAULT_SCALE = 2;
+
 const flagsSchema = z.object({
   dots: z.coerce.number().int().min(3).max(50_000).default(DEFAULT_OPTIONS.dots),
   iters: z.coerce.number().int().min(0).max(1_000).default(DEFAULT_OPTIONS.iters),
@@ -31,29 +34,15 @@ const flagsSchema = z.object({
   edgeBoost: z.coerce.number().min(0).max(5).default(DEFAULT_OPTIONS.edgeBoost),
   seed: z.coerce.number().int().nonnegative().default(DEFAULT_OPTIONS.seed),
   ink: hexColor.default(DEFAULT_OPTIONS.ink),
-  scale: z.coerce.number().int().min(1).max(8).default(2),
+  scale: z.coerce.number().int().min(1).max(8).default(DEFAULT_SCALE),
   cutout: z.boolean().default(DEFAULT_OPTIONS.cutout),
   crop: cropSchema.optional(),
   modelPath: z.string().min(1).optional(),
   out: z.string().min(1).optional(),
 });
 
-/** Validated CLI flags with defaults applied and the output format resolved. */
-export type Flags = z.infer<typeof flagsSchema> & { readonly format: OutputFormat };
-
-/** Output formats inferred from the -o extension. */
-export type OutputFormat = "svg" | "png";
-
-/** Infer the output format from a path's extension. */
-export function outputFormat(out: string | undefined): Result<OutputFormat, StipplerError> {
-  if (out === undefined) return ok("svg");
-  const match = /\.([a-z0-9]+)$/i.exec(out);
-  const ext = match?.[1]?.toLowerCase();
-  if (ext === "svg" || ext === "png") return ok(ext);
-  return err(
-    new StipplerError("INVALID_FLAGS", `output extension must be .svg or .png, got ${out}`),
-  );
-}
+/** Validated CLI flags with defaults applied. */
+export type Flags = z.infer<typeof flagsSchema>;
 
 /** Validate the raw citty arg bag into typed flags. */
 export function parseFlags(raw: Record<string, unknown>): Result<Flags, StipplerError> {
@@ -67,7 +56,5 @@ export function parseFlags(raw: Record<string, unknown>): Result<Flags, Stippler
       .join("; ");
     return err(new StipplerError("INVALID_FLAGS", issues));
   }
-  const format = outputFormat(parsed.data.out);
-  if (!format.success) return format;
-  return ok({ ...parsed.data, format: format.data });
+  return ok(parsed.data);
 }

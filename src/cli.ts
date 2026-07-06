@@ -2,13 +2,13 @@
 import { intro, log, outro, spinner } from "@clack/prompts";
 import { defineCommand, runMain } from "citty";
 import pc from "picocolors";
-import { parseFlags } from "./cli/flags";
-import { writeOutput } from "./cli/output";
+import { DEFAULT_SCALE, parseFlags } from "./cli/flags";
+import { resolveOutput, writeOutput } from "./cli/output";
 import { generateHedcut } from "./core/pipeline";
 import { inputStem, resolveInput } from "./infra/input";
 import { ensureModel } from "./infra/model-cache";
 import type { StipplerError } from "./lib/errors";
-import { DEFAULT_OPTIONS } from "./types";
+import { CANVAS_HEIGHT, CANVAS_WIDTH, DEFAULT_OPTIONS } from "./types";
 
 declare const PACKAGE_VERSION: string;
 
@@ -53,11 +53,14 @@ const main = defineCommand({
       description: `PRNG seed for deterministic output (default ${DEFAULT_OPTIONS.seed})`,
     },
     ink: { type: "string", description: `Dot colour as hex (default ${DEFAULT_OPTIONS.ink})` },
-    scale: { type: "string", description: "PNG scale factor over 360x432 (default 2)" },
+    scale: {
+      type: "string",
+      description: `PNG scale factor over ${CANVAS_WIDTH}x${CANVAS_HEIGHT} (default ${DEFAULT_SCALE})`,
+    },
     crop: { type: "string", description: "Fractional pre-crop x0,y0,x1,y1" },
     cutout: {
       type: "boolean",
-      default: true,
+      default: DEFAULT_OPTIONS.cutout,
       description: "U2Net background removal + head framing (--no-cutout to skip)",
     },
     "model-path": {
@@ -83,13 +86,18 @@ const main = defineCommand({
     });
     if (!flags.success) fail(flags.error);
 
+    const target = resolveOutput(flags.data.out, inputStem(args.input));
+    if (!target.success) fail(target.error);
+
     const s = spinner();
     s.start(flags.data.cutout ? "Reading input and resolving u2net model" : "Reading input");
     // Input read and model resolution are independent; run them together.
+    const abort = new AbortController();
     const imagePromise = resolveInput(args.input);
     const modelPromise = flags.data.cutout
       ? ensureModel({
           modelPath: flags.data.modelPath,
+          signal: abort.signal,
           onProgress: (received, total) => {
             const mb = (received / 1e6).toFixed(0);
             const totalMb = total === null ? "?" : (total / 1e6).toFixed(0);
@@ -99,6 +107,9 @@ const main = defineCommand({
       : undefined;
     const image = await imagePromise;
     if (!image.success) {
+      // Cancel any in-flight model download so its temp file gets cleaned up.
+      abort.abort();
+      await modelPromise;
       s.stop("Reading input failed");
       fail(image.error);
     }
@@ -131,12 +142,7 @@ const main = defineCommand({
     }
     s.stop(`Stippled ${result.data.dotCount} dots`);
 
-    const written = await writeOutput(result.data.svg, {
-      out: flags.data.out,
-      inputStem: inputStem(args.input),
-      format: flags.data.format,
-      scale: flags.data.scale,
-    });
+    const written = await writeOutput(result.data.svg, target.data, flags.data.scale);
     if (!written.success) fail(written.error);
 
     const kb = (Buffer.byteLength(result.data.svg) / 1024).toFixed(0);
