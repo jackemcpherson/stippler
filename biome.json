@@ -1,15 +1,7 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.2/schema.json",
   "files": {
-    "includes": [
-      "**",
-      "!!**/dist",
-      "!!**/svg",
-      "!!**/test/fixtures",
-      "!!**/.venv",
-      "!!credits.json",
-      "!!crops.json"
-    ]
+    "includes": ["**", "!!**/dist", "!!**/svg", "!!**/test/fixtures", "!!credits.json"]
   },
   "linter": {
     "enabled": true,

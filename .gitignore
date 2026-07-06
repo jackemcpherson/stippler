@@ -1,9 +1,5 @@
 node_modules/
 dist/
-# local artifacts from the original Python pipeline; removed after verification
+# local source photos from the original Python pipeline (fetch.py is gone,
+# so these are kept on disk as a test corpus)
 photos/
-cutouts/
-models/
-preview/
-.venv/
-__pycache__/
