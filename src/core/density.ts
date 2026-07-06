@@ -1,4 +1,6 @@
+import { clamp } from "../lib/math";
 import type { GrayImage, RgbImage } from "../types";
+import { pasteOnWhite } from "./raster";
 
 /**
  * Convert interleaved RGB to single-channel luminance.
@@ -19,6 +21,20 @@ export function grayscaleFromRgb(rgb: RgbImage): GrayImage {
   return { data: out, width: rgb.width, height: rgb.height };
 }
 
+/** Remove `cut` histogram mass starting at `start`, walking by `step`. */
+function trimHistogramEnd(hist: number[], cut: number, start: number, step: number): void {
+  for (let i = start; i >= 0 && i < 256 && cut > 0; i += step) {
+    const h = hist[i] ?? 0;
+    if (cut > h) {
+      cut -= h;
+      hist[i] = 0;
+    } else {
+      hist[i] = h - cut;
+      cut = 0;
+    }
+  }
+}
+
 /**
  * Port of PIL `ImageOps.autocontrast(cutoff)`.
  *
@@ -31,30 +47,9 @@ export function autocontrast(im: GrayImage, cutoffPercent: number): GrayImage {
   for (const v of im.data) {
     hist[v] = (hist[v] ?? 0) + 1;
   }
-  const total = im.data.length;
-
-  let cut = Math.trunc((total * cutoffPercent) / 100);
-  for (let i = 0; i < 256 && cut > 0; i++) {
-    const h = hist[i] ?? 0;
-    if (cut > h) {
-      cut -= h;
-      hist[i] = 0;
-    } else {
-      hist[i] = h - cut;
-      cut = 0;
-    }
-  }
-  cut = Math.trunc((total * cutoffPercent) / 100);
-  for (let i = 255; i >= 0 && cut > 0; i--) {
-    const h = hist[i] ?? 0;
-    if (cut > h) {
-      cut -= h;
-      hist[i] = 0;
-    } else {
-      hist[i] = h - cut;
-      cut = 0;
-    }
-  }
+  const cut = Math.trunc((im.data.length * cutoffPercent) / 100);
+  trimHistogramEnd(hist, cut, 0, 1);
+  trimHistogramEnd(hist, cut, 255, -1);
 
   let lo = 0;
   while (lo < 256 && (hist[lo] ?? 0) === 0) lo++;
@@ -68,7 +63,7 @@ export function autocontrast(im: GrayImage, cutoffPercent: number): GrayImage {
   const offset = -lo * scale;
   const lut = new Uint8Array(256);
   for (let i = 0; i < 256; i++) {
-    lut[i] = Math.min(255, Math.max(0, Math.trunc(i * scale + offset)));
+    lut[i] = clamp(Math.trunc(i * scale + offset), 0, 255);
   }
   const out = new Uint8Array(im.data.length);
   for (let i = 0; i < im.data.length; i++) {
@@ -113,16 +108,7 @@ export function pasteGrayOnWhite(
   left: number,
   top: number,
 ): GrayImage {
-  const out = new Uint8Array(dstW * dstH).fill(255);
-  for (let y = 0; y < src.height; y++) {
-    const dy = y + top;
-    if (dy < 0 || dy >= dstH) continue;
-    for (let x = 0; x < src.width; x++) {
-      const dx = x + left;
-      if (dx < 0 || dx >= dstW) continue;
-      out[dy * dstW + dx] = src.data[y * src.width + x] ?? 255;
-    }
-  }
+  const out = pasteOnWhite(src.data, 1, src.width, src.height, dstW, dstH, left, top);
   return { data: out, width: dstW, height: dstH };
 }
 
@@ -147,11 +133,11 @@ export function buildDensity(
       const lum = (gray.data[i] ?? 255) / 255;
       const dark = (1 - lum) ** gamma;
       const e = (edge.data[i] ?? 0) / 255;
-      let v = Math.min(1, Math.max(0, dark + edgeBoost * e));
+      let v = clamp(dark + edgeBoost * e, 0, 1);
 
       const ex = (x / w - 0.5) / 0.5;
       const r = Math.sqrt(ex * ex + ey * ey);
-      const vignette = Math.min(1, Math.max(0, (1.14 - r) / 0.14));
+      const vignette = clamp((1.14 - r) / 0.14, 0, 1);
       v *= vignette;
       d[i] = v < 0.01 ? 0 : v;
     }

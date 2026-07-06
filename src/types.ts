@@ -18,6 +18,28 @@ export const CANVAS_HEIGHT = 432;
 export const DEFAULT_CROP: CropBox = { x0: 0.125, y0: 0.02, x1: 0.875, y1: 0.92 };
 
 /**
+ * Tuned defaults for {@link HedcutOptions} — the single source of truth shared
+ * by the library pipeline and the CLI flag schema.
+ */
+export const DEFAULT_OPTIONS: {
+  readonly dots: number;
+  readonly iters: number;
+  readonly gamma: number;
+  readonly edgeBoost: number;
+  readonly seed: number;
+  readonly ink: string;
+  readonly cutout: boolean;
+} = {
+  dots: 2200,
+  iters: 45,
+  gamma: 1.45,
+  edgeBoost: 0.4,
+  seed: 7,
+  ink: "#1a1a1a",
+  cutout: true,
+};
+
+/**
  * Fractional crop box in [0, 1] image coordinates.
  *
  * Requires 0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1.
@@ -29,41 +51,37 @@ export interface CropBox {
   readonly y1: number;
 }
 
-/** Options for {@link generateHedcut}. All fields have tuned defaults. */
+/** Options for {@link generateHedcut}. Defaults come from {@link DEFAULT_OPTIONS}. */
 export interface HedcutOptions {
-  /** Target number of stipple dots. Default 2200. */
-  readonly dots?: number;
-  /** Lloyd relaxation iterations. Default 45. */
-  readonly iters?: number;
-  /** Darkness exponent; higher concentrates dots in shadows. Default 1.45. */
-  readonly gamma?: number;
-  /** Edge-detection contribution to density in [0, 5]. Default 0.4. */
-  readonly edgeBoost?: number;
-  /** PRNG seed for deterministic output. Default 7. */
-  readonly seed?: number;
-  /** Dot colour as a hex string. Default "#1a1a1a". */
-  readonly ink?: string;
+  /** Target number of stipple dots. */
+  readonly dots?: number | undefined;
+  /** Lloyd relaxation iterations. */
+  readonly iters?: number | undefined;
+  /** Darkness exponent; higher concentrates dots in shadows. */
+  readonly gamma?: number | undefined;
+  /** Edge-detection contribution to density in [0, 5]. */
+  readonly edgeBoost?: number | undefined;
+  /** PRNG seed for deterministic output. */
+  readonly seed?: number | undefined;
+  /** Dot colour as a hex string. */
+  readonly ink?: string | undefined;
   /**
-   * Run U2Net background removal and head-normalised framing. Default true.
+   * Run U2Net background removal and head-normalised framing.
    * When true, {@link modelPath} must point to a u2net.onnx file.
    */
-  readonly cutout?: boolean;
+  readonly cutout?: boolean | undefined;
   /** Path to u2net.onnx. Required when cutout is enabled; never downloaded here. */
-  readonly modelPath?: string;
+  readonly modelPath?: string | undefined;
   /** Fractional pre-crop applied before matting (or instead of DEFAULT_CROP). */
-  readonly crop?: CropBox;
+  readonly crop?: CropBox | undefined;
 }
 
-/** Result payload of {@link generateHedcut}. */
+/** Result payload of {@link generateHedcut}. The SVG viewBox is always CANVAS_WIDTH x CANVAS_HEIGHT. */
 export interface HedcutOutput {
   /** Complete SVG document. */
   readonly svg: string;
   /** Number of dots rendered. */
   readonly dotCount: number;
-  /** SVG viewBox width (always 360). */
-  readonly width: number;
-  /** SVG viewBox height (always 432). */
-  readonly height: number;
 }
 
 /** Single-channel 8-bit image in scanline order. */

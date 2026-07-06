@@ -22,9 +22,8 @@ describe("writeOutput", () => {
     const result = await writeOutput(SVG, {
       out: join(dir, "nested", "a.svg"),
       inputStem: "x",
+      format: "svg",
       scale: 2,
-      width: 360,
-      height: 432,
     });
     expect(result.success).toBe(true);
     if (result.success) {
@@ -36,9 +35,8 @@ describe("writeOutput", () => {
     const result = await writeOutput(SVG, {
       out: join(dir, "a.png"),
       inputStem: "x",
+      format: "png",
       scale: 2,
-      width: 360,
-      height: 432,
     });
     expect(result.success).toBe(true);
     if (result.success) {
@@ -55,9 +53,8 @@ describe("writeOutput", () => {
     try {
       const result = await writeOutput(SVG, {
         inputStem: "portrait",
+        format: "svg",
         scale: 2,
-        width: 360,
-        height: 432,
       });
       expect(result.success).toBe(true);
       // macOS tmpdir is a symlink (/var -> /private/var); compare real paths.

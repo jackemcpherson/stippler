@@ -24,6 +24,7 @@ export {
   CANVAS_WIDTH,
   type CropBox,
   DEFAULT_CROP,
+  DEFAULT_OPTIONS,
   type Frame,
   type GrayImage,
   type HedcutOptions,

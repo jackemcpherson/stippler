@@ -7,7 +7,8 @@ import { writeOutput } from "./cli/output";
 import { generateHedcut } from "./core/pipeline";
 import { inputStem, resolveInput } from "./infra/input";
 import { ensureModel } from "./infra/model-cache";
-import { StipplerError } from "./lib/errors";
+import type { StipplerError } from "./lib/errors";
+import { DEFAULT_OPTIONS } from "./types";
 
 declare const PACKAGE_VERSION: string;
 
@@ -34,12 +35,24 @@ const main = defineCommand({
       alias: "o",
       description: "Output path; .svg or .png decides the format (default <input>.svg)",
     },
-    dots: { type: "string", description: "Number of stipple dots (default 2200)" },
-    iters: { type: "string", description: "Lloyd relaxation iterations (default 45)" },
-    gamma: { type: "string", description: "Darkness exponent (default 1.45)" },
-    "edge-boost": { type: "string", description: "Edge contribution to density (default 0.4)" },
-    seed: { type: "string", description: "PRNG seed for deterministic output (default 7)" },
-    ink: { type: "string", description: "Dot colour as hex (default #1a1a1a)" },
+    dots: {
+      type: "string",
+      description: `Number of stipple dots (default ${DEFAULT_OPTIONS.dots})`,
+    },
+    iters: {
+      type: "string",
+      description: `Lloyd relaxation iterations (default ${DEFAULT_OPTIONS.iters})`,
+    },
+    gamma: { type: "string", description: `Darkness exponent (default ${DEFAULT_OPTIONS.gamma})` },
+    "edge-boost": {
+      type: "string",
+      description: `Edge contribution to density (default ${DEFAULT_OPTIONS.edgeBoost})`,
+    },
+    seed: {
+      type: "string",
+      description: `PRNG seed for deterministic output (default ${DEFAULT_OPTIONS.seed})`,
+    },
+    ink: { type: "string", description: `Dot colour as hex (default ${DEFAULT_OPTIONS.ink})` },
     scale: { type: "string", description: "PNG scale factor over 360x432 (default 2)" },
     crop: { type: "string", description: "Fractional pre-crop x0,y0,x1,y1" },
     cutout: {
@@ -71,32 +84,34 @@ const main = defineCommand({
     if (!flags.success) fail(flags.error);
 
     const s = spinner();
-    s.start("Reading input");
-    const image = await resolveInput(args.input);
+    s.start(flags.data.cutout ? "Reading input and resolving u2net model" : "Reading input");
+    // Input read and model resolution are independent; run them together.
+    const imagePromise = resolveInput(args.input);
+    const modelPromise = flags.data.cutout
+      ? ensureModel({
+          modelPath: flags.data.modelPath,
+          onProgress: (received, total) => {
+            const mb = (received / 1e6).toFixed(0);
+            const totalMb = total === null ? "?" : (total / 1e6).toFixed(0);
+            s.message(`Downloading u2net.onnx (one-time): ${mb} / ${totalMb} MB`);
+          },
+        })
+      : undefined;
+    const image = await imagePromise;
     if (!image.success) {
       s.stop("Reading input failed");
       fail(image.error);
     }
-    s.stop(`Read ${args.input}`);
-
     let modelPath: string | undefined;
-    if (flags.data.cutout) {
-      s.start("Resolving u2net model");
-      const model = await ensureModel({
-        ...(flags.data.modelPath !== undefined ? { modelPath: flags.data.modelPath } : {}),
-        onProgress: (received, total) => {
-          const mb = (received / 1e6).toFixed(0);
-          const totalMb = total === null ? "?" : (total / 1e6).toFixed(0);
-          s.message(`Downloading u2net.onnx (one-time): ${mb} / ${totalMb} MB`);
-        },
-      });
+    if (modelPromise !== undefined) {
+      const model = await modelPromise;
       if (!model.success) {
         s.stop("Model resolution failed");
         fail(model.error);
       }
       modelPath = model.data;
-      s.stop("Model ready");
     }
+    s.stop(`Read ${args.input}`);
 
     s.start(`Stippling (${flags.data.dots} dots, ${flags.data.iters} iterations)`);
     const result = await generateHedcut(image.data, {
@@ -107,8 +122,8 @@ const main = defineCommand({
       seed: flags.data.seed,
       ink: flags.data.ink,
       cutout: flags.data.cutout,
-      ...(modelPath !== undefined ? { modelPath } : {}),
-      ...(flags.data.crop !== undefined ? { crop: flags.data.crop } : {}),
+      modelPath,
+      crop: flags.data.crop,
     });
     if (!result.success) {
       s.stop("Stippling failed");
@@ -117,11 +132,10 @@ const main = defineCommand({
     s.stop(`Stippled ${result.data.dotCount} dots`);
 
     const written = await writeOutput(result.data.svg, {
-      ...(flags.data.out !== undefined ? { out: flags.data.out } : {}),
+      out: flags.data.out,
       inputStem: inputStem(args.input),
+      format: flags.data.format,
       scale: flags.data.scale,
-      width: result.data.width,
-      height: result.data.height,
     });
     if (!written.success) fail(written.error);
 
@@ -131,10 +145,7 @@ const main = defineCommand({
 });
 
 runMain(main).catch((error: unknown) => {
-  if (error instanceof StipplerError) {
-    console.error(pc.red(error.message));
-  } else {
-    console.error(pc.red(`unexpected error: ${error instanceof Error ? error.message : error}`));
-  }
+  // StipplerErrors are all routed through fail(); anything here is a bug.
+  console.error(pc.red(`unexpected error: ${error instanceof Error ? error.message : error}`));
   process.exit(1);
 });

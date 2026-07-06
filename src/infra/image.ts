@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import { StipplerError } from "../lib/errors";
-import type { CropBox, GrayImage, RgbImage } from "../types";
+import { CANVAS_HEIGHT, CANVAS_WIDTH, type GrayImage, type RgbImage } from "../types";
 
 /**
  * Decode any sharp-supported image to raw interleaved RGB.
@@ -25,20 +25,22 @@ export async function decodeToRgb(buffer: Buffer): Promise<RgbImage> {
   }
 }
 
-/** Fractional crop with Python `int()` truncation of pixel bounds. */
-export function cropFractional(im: RgbImage, box: CropBox): RgbImage {
-  const x0 = Math.trunc(box.x0 * im.width);
-  const y0 = Math.trunc(box.y0 * im.height);
-  const x1 = Math.trunc(box.x1 * im.width);
-  const y1 = Math.trunc(box.y1 * im.height);
-  const w = x1 - x0;
-  const h = y1 - y0;
-  const out = new Uint8Array(w * h * 3);
-  for (let y = 0; y < h; y++) {
-    const srcStart = 3 * ((y + y0) * im.width + x0);
-    out.set(im.data.subarray(srcStart, srcStart + w * 3), 3 * y * w);
+/**
+ * Finish a sharp pipeline that must produce single-channel output.
+ *
+ * sharp expands single-channel raw input to 3 channels when processing;
+ * extractChannel(0) forces the output back to one channel, and the guard
+ * catches regressions of that workaround.
+ */
+async function toGray(pipeline: sharp.Sharp, what: string): Promise<GrayImage> {
+  const { data, info } = await pipeline
+    .extractChannel(0)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  if (info.channels !== 1) {
+    throw new StipplerError("UNSUPPORTED_IMAGE", `${what} returned multi-channel data`);
   }
-  return { data: out, width: w, height: h };
+  return { data: new Uint8Array(data), width: info.width, height: info.height };
 }
 
 /**
@@ -46,19 +48,14 @@ export function cropFractional(im: RgbImage, box: CropBox): RgbImage {
  * exact target dimensions, no aspect preservation) and lanczos3.
  */
 export async function resizeGray(im: GrayImage, width: number, height: number): Promise<GrayImage> {
-  // sharp expands single-channel raw input to 3 channels when resizing;
-  // extractChannel(0) forces the output back to one channel.
-  const { data, info } = await sharp(im.data, {
-    raw: { width: im.width, height: im.height, channels: 1 },
-  })
-    .resize(width, height, { fit: "fill", kernel: "lanczos3" })
-    .extractChannel(0)
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  if (info.channels !== 1) {
-    throw new StipplerError("UNSUPPORTED_IMAGE", "grayscale resize returned multi-channel data");
-  }
-  return { data: new Uint8Array(data), width: info.width, height: info.height };
+  return toGray(
+    sharp(im.data, { raw: { width: im.width, height: im.height, channels: 1 } }).resize(
+      width,
+      height,
+      { fit: "fill", kernel: "lanczos3" },
+    ),
+    "grayscale resize",
+  );
 }
 
 /** Resize an RGB image with `fit: "fill"` and lanczos3. */
@@ -80,39 +77,29 @@ export async function resizeRgb(im: RgbImage, width: number, height: number): Pr
  * zero exactly like PIL's "L" mode.
  */
 export async function edgeMap(gray: GrayImage): Promise<GrayImage> {
-  const { data, info } = await sharp(gray.data, {
-    raw: { width: gray.width, height: gray.height, channels: 1 },
-  })
-    .convolve({
-      width: 3,
-      height: 3,
-      kernel: [-1, -1, -1, -1, 8, -1, -1, -1, -1],
-      scale: 1,
-      offset: 0,
-    })
-    .blur(1)
-    .extractChannel(0)
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  if (info.channels !== 1) {
-    throw new StipplerError("UNSUPPORTED_IMAGE", "edge map returned multi-channel data");
-  }
-  return { data: new Uint8Array(data), width: info.width, height: info.height };
+  return toGray(
+    sharp(gray.data, { raw: { width: gray.width, height: gray.height, channels: 1 } })
+      .convolve({
+        width: 3,
+        height: 3,
+        kernel: [-1, -1, -1, -1, 8, -1, -1, -1, -1],
+        scale: 1,
+        offset: 0,
+      })
+      .blur(1),
+    "edge map",
+  );
 }
 
 /**
- * Rasterise a stipple SVG (viewBox only, no width/height attributes) to PNG
- * at an integer scale factor, flattened onto white.
+ * Rasterise a stipple SVG to PNG at an integer scale factor, flattened onto
+ * white. The SVG's intrinsic size is its viewBox (360x432); rendering at
+ * `72 * scale` DPI scales the vector output without touching the markup.
  */
-export async function rasterizeSvgToPng(
-  svg: string,
-  scale: number,
-  viewWidth: number,
-  viewHeight: number,
-): Promise<Buffer> {
-  const sized = svg.replace(
-    /^<svg /,
-    `<svg width="${viewWidth * scale}" height="${viewHeight * scale}" `,
-  );
-  return sharp(Buffer.from(sized)).flatten({ background: "#ffffff" }).png().toBuffer();
+export async function rasterizeSvgToPng(svg: string, scale: number): Promise<Buffer> {
+  return sharp(Buffer.from(svg), { density: 72 * scale })
+    .resize(CANVAS_WIDTH * scale, CANVAS_HEIGHT * scale, { fit: "fill" })
+    .flatten({ background: "#ffffff" })
+    .png()
+    .toBuffer();
 }

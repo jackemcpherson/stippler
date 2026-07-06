@@ -1,5 +1,6 @@
 import { Delaunay } from "d3-delaunay";
 import { StipplerError } from "../lib/errors";
+import { clamp } from "../lib/math";
 import { type Rng, uniform } from "../lib/random";
 
 /** Points and their sampled darkness after relaxation and thresholding. */
@@ -178,8 +179,8 @@ export function sampleDarkness(
   for (let k = 0; k < n; k++) {
     const x = points[2 * k] ?? 0;
     const y = points[2 * k + 1] ?? 0;
-    const xi = Math.min(width - 1, Math.max(0, Math.round(x)));
-    const yi = Math.min(height - 1, Math.max(0, Math.round(y)));
+    const xi = clamp(Math.round(x), 0, width - 1);
+    const yi = clamp(Math.round(y), 0, height - 1);
     const dark = density[yi * width + xi] ?? 0;
     if (dark > 0.02) {
       keptPts.push(x, y);
@@ -202,12 +203,10 @@ export function stipple(
   iters: number,
   rng: Rng,
 ): StippleResult {
-  let total = 0;
-  for (const v of density) total += v;
-  if (total <= 0) {
+  const points = sampleSeeds(density, width, nDots, rng);
+  if (points.length === 0) {
     throw new StipplerError("EMPTY_DENSITY", "density map is empty — image may be blank");
   }
-  const points = sampleSeeds(density, width, nDots, rng);
   relax(points, density, width, height, iters);
   return sampleDarkness(points, density, width, height);
 }

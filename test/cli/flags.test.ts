@@ -1,21 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { outputFormat, parseFlags } from "../../src/cli/flags";
+import { DEFAULT_OPTIONS } from "../../src/types";
 
 describe("parseFlags", () => {
   it("materialises all defaults from an empty bag", () => {
     const result = parseFlags({ cutout: true });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data).toMatchObject({
-        dots: 2200,
-        iters: 45,
-        gamma: 1.45,
-        edgeBoost: 0.4,
-        seed: 7,
-        ink: "#1a1a1a",
-        scale: 2,
-        cutout: true,
-      });
+      expect(result.data).toMatchObject({ ...DEFAULT_OPTIONS, scale: 2, format: "svg" });
       expect(result.data.crop).toBeUndefined();
     }
   });

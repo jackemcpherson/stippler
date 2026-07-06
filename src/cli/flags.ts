@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { StipplerError } from "../lib/errors";
 import { err, ok, type Result } from "../lib/result";
-import type { CropBox } from "../types";
+import { type CropBox, DEFAULT_OPTIONS } from "../types";
 
 const hexColor = z
   .string()
@@ -25,21 +25,21 @@ const cropSchema = z.string().transform((s, ctx): CropBox => {
 });
 
 const flagsSchema = z.object({
-  dots: z.coerce.number().int().min(3).max(50_000).default(2200),
-  iters: z.coerce.number().int().min(0).max(1_000).default(45),
-  gamma: z.coerce.number().positive().max(10).default(1.45),
-  edgeBoost: z.coerce.number().min(0).max(5).default(0.4),
-  seed: z.coerce.number().int().nonnegative().default(7),
-  ink: hexColor.default("#1a1a1a"),
+  dots: z.coerce.number().int().min(3).max(50_000).default(DEFAULT_OPTIONS.dots),
+  iters: z.coerce.number().int().min(0).max(1_000).default(DEFAULT_OPTIONS.iters),
+  gamma: z.coerce.number().positive().max(10).default(DEFAULT_OPTIONS.gamma),
+  edgeBoost: z.coerce.number().min(0).max(5).default(DEFAULT_OPTIONS.edgeBoost),
+  seed: z.coerce.number().int().nonnegative().default(DEFAULT_OPTIONS.seed),
+  ink: hexColor.default(DEFAULT_OPTIONS.ink),
   scale: z.coerce.number().int().min(1).max(8).default(2),
-  cutout: z.boolean().default(true),
+  cutout: z.boolean().default(DEFAULT_OPTIONS.cutout),
   crop: cropSchema.optional(),
   modelPath: z.string().min(1).optional(),
   out: z.string().min(1).optional(),
 });
 
-/** Validated CLI flags with defaults applied. */
-export type Flags = z.infer<typeof flagsSchema>;
+/** Validated CLI flags with defaults applied and the output format resolved. */
+export type Flags = z.infer<typeof flagsSchema> & { readonly format: OutputFormat };
 
 /** Output formats inferred from the -o extension. */
 export type OutputFormat = "svg" | "png";
@@ -67,7 +67,7 @@ export function parseFlags(raw: Record<string, unknown>): Result<Flags, Stippler
       .join("; ");
     return err(new StipplerError("INVALID_FLAGS", issues));
   }
-  const formatCheck = outputFormat(parsed.data.out);
-  if (!formatCheck.success) return formatCheck;
-  return ok(parsed.data);
+  const format = outputFormat(parsed.data.out);
+  if (!format.success) return format;
+  return ok({ ...parsed.data, format: format.data });
 }

@@ -33,7 +33,7 @@ async function fileSize(path: string): Promise<number | undefined> {
  * the default cache path is (re-)downloaded when missing or truncated.
  */
 export async function ensureModel(opts: {
-  modelPath?: string;
+  modelPath?: string | undefined;
   onProgress?: (receivedBytes: number, totalBytes: number | null) => void;
 }): Promise<Result<string, StipplerError>> {
   if (opts.modelPath !== undefined) {

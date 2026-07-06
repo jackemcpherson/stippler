@@ -5,6 +5,8 @@
  * and bucketing radii into 6 classes keeps the file to a handful of paths.
  */
 
+import { clamp } from "../lib/math";
+
 const BUCKETS = 6;
 
 /** Dot radius from darkness: 0.5 + 1.55 * dark^0.85 (range 0.5–2.05). */
@@ -32,28 +34,26 @@ export function renderSvg(
   }
   const spread = max - min;
 
+  const ds = new Array<string>(BUCKETS).fill("");
+  const sums = new Float64Array(BUCKETS);
+  const counts = new Uint32Array(BUCKETS);
+  for (let i = 0; i < n; i++) {
+    const r = radii[i] ?? 0;
+    const b = clamp(Math.floor(((r - min) / (spread + 1e-9)) * BUCKETS), 0, BUCKETS - 1);
+    sums[b] = (sums[b] ?? 0) + r;
+    counts[b] = (counts[b] ?? 0) + 1;
+    ds[b] += `M${(points[2 * i] ?? 0).toFixed(1)} ${(points[2 * i + 1] ?? 0).toFixed(1)}h.01`;
+  }
+
   const parts = [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" role="img">`,
   ];
   for (let b = 0; b < BUCKETS; b++) {
-    let sum = 0;
-    let count = 0;
-    let d = "";
-    for (let i = 0; i < n; i++) {
-      const r = radii[i] ?? 0;
-      const bucket = Math.min(
-        BUCKETS - 1,
-        Math.max(0, Math.floor(((r - min) / (spread + 1e-9)) * BUCKETS)),
-      );
-      if (bucket !== b) continue;
-      sum += r;
-      count++;
-      d += `M${(points[2 * i] ?? 0).toFixed(1)} ${(points[2 * i + 1] ?? 0).toFixed(1)}h.01`;
-    }
+    const count = counts[b] ?? 0;
     if (count === 0) continue;
-    const strokeWidth = ((2 * sum) / count).toFixed(2);
+    const strokeWidth = ((2 * (sums[b] ?? 0)) / count).toFixed(2);
     parts.push(
-      `<path stroke="${ink}" stroke-width="${strokeWidth}" stroke-linecap="round" fill="none" d="${d}"/>`,
+      `<path stroke="${ink}" stroke-width="${strokeWidth}" stroke-linecap="round" fill="none" d="${ds[b]}"/>`,
     );
   }
   parts.push("</svg>");

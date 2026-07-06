@@ -1,4 +1,4 @@
-import { cropFractional, decodeToRgb, edgeMap, resizeGray } from "../infra/image";
+import { decodeToRgb, edgeMap, resizeGray } from "../infra/image";
 import { StipplerError } from "../lib/errors";
 import { createRng } from "../lib/random";
 import { err, ok, type Result } from "../lib/result";
@@ -6,6 +6,7 @@ import {
   CANVAS_HEIGHT,
   CANVAS_WIDTH,
   DEFAULT_CROP,
+  DEFAULT_OPTIONS,
   type HedcutOptions,
   type HedcutOutput,
   type RgbImage,
@@ -18,28 +19,21 @@ import {
   pasteGrayOnWhite,
 } from "./density";
 import { compositeOnWhite, computeHeadFrame, pasteRgbOnWhite } from "./head-frame";
+import { cropFractional } from "./raster";
 import { stipple } from "./stipple";
 import { renderSvg } from "./svg";
 
-interface ResolvedOptions {
-  readonly dots: number;
-  readonly iters: number;
-  readonly gamma: number;
-  readonly edgeBoost: number;
-  readonly seed: number;
-  readonly ink: string;
-  readonly cutout: boolean;
-}
+type ResolvedOptions = typeof DEFAULT_OPTIONS;
 
 function resolveOptions(options: HedcutOptions): ResolvedOptions {
   return {
-    dots: options.dots ?? 2200,
-    iters: options.iters ?? 45,
-    gamma: options.gamma ?? 1.45,
-    edgeBoost: options.edgeBoost ?? 0.4,
-    seed: options.seed ?? 7,
-    ink: options.ink ?? "#1a1a1a",
-    cutout: options.cutout ?? true,
+    dots: options.dots ?? DEFAULT_OPTIONS.dots,
+    iters: options.iters ?? DEFAULT_OPTIONS.iters,
+    gamma: options.gamma ?? DEFAULT_OPTIONS.gamma,
+    edgeBoost: options.edgeBoost ?? DEFAULT_OPTIONS.edgeBoost,
+    seed: options.seed ?? DEFAULT_OPTIONS.seed,
+    ink: options.ink ?? DEFAULT_OPTIONS.ink,
+    cutout: options.cutout ?? DEFAULT_OPTIONS.cutout,
   };
 }
 
@@ -75,6 +69,13 @@ export async function generateHedcut(
   options: HedcutOptions = {},
 ): Promise<Result<HedcutOutput, StipplerError>> {
   const resolved = resolveOptions(options);
+  const modelPath = options.modelPath;
+  // Warm the ONNX session while the image decodes — model load dominates startup.
+  const sessionPromise =
+    resolved.cutout && modelPath !== undefined
+      ? import("../infra/matte").then((m) => m.createMatteSession(modelPath))
+      : undefined;
+  sessionPromise?.catch(() => {}); // surfaced below when awaited
   try {
     let rgb = await decodeToRgb(image);
 
@@ -84,7 +85,7 @@ export async function generateHedcut(
 
     let framed: RgbImage;
     if (resolved.cutout) {
-      if (options.modelPath === undefined) {
+      if (sessionPromise === undefined) {
         return err(
           new StipplerError(
             "MODEL_NOT_FOUND",
@@ -92,8 +93,7 @@ export async function generateHedcut(
           ),
         );
       }
-      const { createMatteSession } = await import("../infra/matte");
-      const session = await createMatteSession(options.modelPath);
+      const session = await sessionPromise;
       const matte = await session.alphaMatte(rgb);
       const composited = compositeOnWhite(rgb, matte);
       const frame = computeHeadFrame(matte, rgb.width, rgb.height);
@@ -126,7 +126,7 @@ export async function generateHedcut(
       rng,
     );
     const svg = renderSvg(points, darkness, resolved.ink, CANVAS_WIDTH, CANVAS_HEIGHT);
-    return ok({ svg, dotCount: darkness.length, width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
+    return ok({ svg, dotCount: darkness.length });
   } catch (error) {
     if (error instanceof StipplerError) {
       return err(error);

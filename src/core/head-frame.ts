@@ -1,4 +1,5 @@
 import type { Frame, RgbImage } from "../types";
+import { pasteOnWhite } from "./raster";
 
 /** numpy-style linear-interpolation percentile over a copy of `values`. */
 function percentile(values: number[], p: number): number {
@@ -76,9 +77,11 @@ export function compositeOnWhite(rgb: RgbImage, matte: Float64Array): RgbImage {
   const out = new Uint8Array(n * 3);
   for (let i = 0; i < n; i++) {
     const m = matte[i] ?? 0;
-    for (let c = 0; c < 3; c++) {
-      out[3 * i + c] = Math.trunc((rgb.data[3 * i + c] ?? 0) * m + 255 * (1 - m));
-    }
+    const bg = 255 * (1 - m);
+    const j = 3 * i;
+    out[j] = Math.trunc((rgb.data[j] ?? 0) * m + bg);
+    out[j + 1] = Math.trunc((rgb.data[j + 1] ?? 0) * m + bg);
+    out[j + 2] = Math.trunc((rgb.data[j + 2] ?? 0) * m + bg);
   }
   return { data: out, width: rgb.width, height: rgb.height };
 }
@@ -86,24 +89,17 @@ export function compositeOnWhite(rgb: RgbImage, matte: Float64Array): RgbImage {
 /**
  * Copy `src` into a white canvas of the frame's size, positioned so that
  * source pixel (frame.left, frame.top) lands at the canvas origin.
- *
- * Pure clipped row-copy: sharp's composite rejects negative offsets, which
- * head frames routinely produce.
  */
 export function pasteRgbOnWhite(src: RgbImage, frame: Frame): RgbImage {
-  const out = new Uint8Array(frame.width * frame.height * 3).fill(255);
-  for (let y = 0; y < frame.height; y++) {
-    const sy = y + frame.top;
-    if (sy < 0 || sy >= src.height) continue;
-    for (let x = 0; x < frame.width; x++) {
-      const sx = x + frame.left;
-      if (sx < 0 || sx >= src.width) continue;
-      const si = 3 * (sy * src.width + sx);
-      const di = 3 * (y * frame.width + x);
-      out[di] = src.data[si] ?? 255;
-      out[di + 1] = src.data[si + 1] ?? 255;
-      out[di + 2] = src.data[si + 2] ?? 255;
-    }
-  }
+  const out = pasteOnWhite(
+    src.data,
+    3,
+    src.width,
+    src.height,
+    frame.width,
+    frame.height,
+    -frame.left,
+    -frame.top,
+  );
   return { data: out, width: frame.width, height: frame.height };
 }

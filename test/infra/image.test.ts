@@ -1,8 +1,8 @@
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
-import { cropFractional, decodeToRgb, edgeMap, rasterizeSvgToPng } from "../../src/infra/image";
+import { decodeToRgb, edgeMap, rasterizeSvgToPng } from "../../src/infra/image";
 import { StipplerError } from "../../src/lib/errors";
-import type { GrayImage, RgbImage } from "../../src/types";
+import type { GrayImage } from "../../src/types";
 
 async function makePng(width: number, height: number, rgb: [number, number, number]) {
   return sharp({
@@ -25,22 +25,6 @@ describe("decodeToRgb", () => {
 
   it("throws UNSUPPORTED_IMAGE for undecodable buffers", async () => {
     await expect(decodeToRgb(Buffer.from("not an image"))).rejects.toThrowError(StipplerError);
-  });
-});
-
-describe("cropFractional", () => {
-  it("crops with truncating pixel bounds", () => {
-    const data = new Uint8Array(10 * 10 * 3);
-    for (let i = 0; i < 100; i++) {
-      data[3 * i] = i % 10; // encode x in red channel
-      data[3 * i + 1] = Math.floor(i / 10); // y in green
-    }
-    const im: RgbImage = { data, width: 10, height: 10 };
-    const out = cropFractional(im, { x0: 0.1, y0: 0, x1: 0.9, y1: 1 });
-    expect(out.width).toBe(8);
-    expect(out.height).toBe(10);
-    expect(out.data[0]).toBe(1); // first column is source x=1
-    expect(out.data[3 * (out.width - 1)]).toBe(8); // last column is source x=8
   });
 });
 
@@ -100,7 +84,7 @@ describe("rasterizeSvgToPng", () => {
       '<path stroke="#1a1a1a" stroke-width="40" stroke-linecap="round" fill="none" d="M180 216h.01"/>',
       "</svg>",
     ].join("\n");
-    const png = await rasterizeSvgToPng(svg, 2, 360, 432);
+    const png = await rasterizeSvgToPng(svg, 2);
     const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true });
     expect(info.width).toBe(720);
     expect(info.height).toBe(864);
