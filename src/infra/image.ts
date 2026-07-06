@@ -46,12 +46,18 @@ export function cropFractional(im: RgbImage, box: CropBox): RgbImage {
  * exact target dimensions, no aspect preservation) and lanczos3.
  */
 export async function resizeGray(im: GrayImage, width: number, height: number): Promise<GrayImage> {
+  // sharp expands single-channel raw input to 3 channels when resizing;
+  // extractChannel(0) forces the output back to one channel.
   const { data, info } = await sharp(im.data, {
     raw: { width: im.width, height: im.height, channels: 1 },
   })
     .resize(width, height, { fit: "fill", kernel: "lanczos3" })
+    .extractChannel(0)
     .raw()
     .toBuffer({ resolveWithObject: true });
+  if (info.channels !== 1) {
+    throw new StipplerError("UNSUPPORTED_IMAGE", "grayscale resize returned multi-channel data");
+  }
   return { data: new Uint8Array(data), width: info.width, height: info.height };
 }
 
@@ -85,8 +91,12 @@ export async function edgeMap(gray: GrayImage): Promise<GrayImage> {
       offset: 0,
     })
     .blur(1)
+    .extractChannel(0)
     .raw()
     .toBuffer({ resolveWithObject: true });
+  if (info.channels !== 1) {
+    throw new StipplerError("UNSUPPORTED_IMAGE", "edge map returned multi-channel data");
+  }
   return { data: new Uint8Array(data), width: info.width, height: info.height };
 }
 

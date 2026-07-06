@@ -7,7 +7,10 @@ import { err, ok, type Result } from "../lib/result";
 export async function resolveInput(input: string): Promise<Result<Buffer, StipplerError>> {
   if (/^https?:\/\//i.test(input)) {
     try {
-      const response = await fetch(input);
+      // Some hosts (e.g. Wikimedia) reject requests without a User-Agent.
+      const response = await fetch(input, {
+        headers: { "user-agent": "stippler (github.com/jackemcpherson/hedcut)" },
+      });
       if (!response.ok) {
         return err(
           new StipplerError(

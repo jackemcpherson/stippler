@@ -44,7 +44,26 @@ describe("cropFractional", () => {
   });
 });
 
+describe("resizeGray", () => {
+  it("returns exactly width*height bytes (sharp expands raw gray to 3 channels)", async () => {
+    const { resizeGray } = await import("../../src/infra/image");
+    const out = await resizeGray(
+      { data: new Uint8Array(10 * 10).fill(128), width: 10, height: 10 },
+      37,
+      53,
+    );
+    expect(out.data.length).toBe(37 * 53);
+    expect(out.data[0]).toBe(128);
+  });
+});
+
 describe("edgeMap", () => {
+  it("returns exactly width*height bytes", async () => {
+    const im: GrayImage = { data: new Uint8Array(20 * 20).fill(99), width: 20, height: 20 };
+    const out = await edgeMap(im);
+    expect(out.data.length).toBe(20 * 20);
+  });
+
   it("returns near-zero for a constant image", async () => {
     const im: GrayImage = { data: new Uint8Array(20 * 20).fill(128), width: 20, height: 20 };
     const out = await edgeMap(im);
