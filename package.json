@@ -1,0 +1,70 @@
+{
+  "name": "stippler",
+  "version": "0.1.0",
+  "description": "WSJ-hedcut-style stipple portraits from photos: U2Net cutout + weighted Voronoi stippling, output as compact SVG",
+  "license": "MIT",
+  "author": "Jack McPherson <jackemcpherson@gmail.com>",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "stippler": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jackemcpherson/hedcut.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "stipple",
+    "hedcut",
+    "svg",
+    "voronoi",
+    "portrait",
+    "u2net"
+  ],
+  "scripts": {
+    "build": "bunup && bun run build.ts",
+    "test": "vitest",
+    "check": "biome check .",
+    "format": "biome format --write .",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run typecheck && bun run build"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.1.0",
+    "citty": "^0.2.1",
+    "d3-delaunay": "^6.0.4",
+    "onnxruntime-node": "^1.20.0",
+    "picocolors": "^1.1.1",
+    "sharp": "^0.34.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.9",
+    "@types/d3-delaunay": "^6.0.4",
+    "@types/node": "^25.5.0",
+    "bunup": "^0.16.31",
+    "esbuild": "^0.27.4",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.1"
+  },
+  "trustedDependencies": [
+    "onnxruntime-node"
+  ]
+}

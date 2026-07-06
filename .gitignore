@@ -1,3 +1,6 @@
+node_modules/
+dist/
+# local artifacts from the original Python pipeline; removed after verification
 photos/
 cutouts/
 models/
