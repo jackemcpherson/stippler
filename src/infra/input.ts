@@ -13,7 +13,7 @@ export async function resolveInput(input: string): Promise<Result<Buffer, Stippl
     try {
       // Some hosts (e.g. Wikimedia) reject requests without a User-Agent.
       const response = await fetch(input, {
-        headers: { "user-agent": "stippler (github.com/jackemcpherson/hedcut)" },
+        headers: { "user-agent": "stippler (github.com/jackemcpherson/stippler)" },
       });
       if (!response.ok) {
         return err(

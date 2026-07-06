@@ -25,4 +25,4 @@ Initial release.
 - EXIF orientation handling, deterministic output for a fixed seed, and typed
   errors (`StipplerError`) throughout.
 
-[0.1.0]: https://github.com/jackemcpherson/hedcut/releases/tag/v0.1.0
+[0.1.0]: https://github.com/jackemcpherson/stippler/releases/tag/v0.1.0

@@ -25,7 +25,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jackemcpherson/hedcut.git"
+    "url": "git+https://github.com/jackemcpherson/stippler.git"
   },
   "publishConfig": {
     "access": "public"
