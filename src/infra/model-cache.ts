@@ -90,6 +90,7 @@ export async function ensureModel(opts: {
     const contentLength = response.headers.get("content-length");
     const total = contentLength === null ? null : Number(contentLength);
     if (total !== null && (!Number.isFinite(total) || total > MODEL_SIZE_MAX)) {
+      await response.body?.cancel().catch(() => {});
       return err(
         new StipplerError(
           "MODEL_DOWNLOAD_FAILED",
