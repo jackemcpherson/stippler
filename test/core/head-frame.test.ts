@@ -36,6 +36,20 @@ describe("computeHeadFrame", () => {
     expect(frame).toEqual({ left: 0, top: 0, width: 50, height: 60 });
   });
 
+  it("returns the full frame when the matte is too sparse to measure a head", () => {
+    // Two isolated pixels: y0=5, y1=15 in a 20x30 image.
+    // zoneRows = max(1, trunc(0.2*(15-5))) = 2; zone covers y=5 and y=6.
+    // Row y=5 has 1 pixel, row y=6 has 0 -> widths=[1,0].
+    // percentile([0,1], 80): pos=0.8, result=0.8; headW=trunc(0.8)=0 -> size=0 < 1.
+    const width = 20;
+    const height = 30;
+    const m = new Float64Array(width * height);
+    m[5 * width + 10] = 1.0; // y=5, x=10
+    m[15 * width + 10] = 1.0; // y=15, x=10
+    const frame = computeHeadFrame(m, width, height);
+    expect(frame).toEqual({ left: 0, top: 0, width, height });
+  });
+
   it("truncates a negative fractional top toward zero", () => {
     // Rectangle touching the top edge: y0=0, head_w=40, size=70,
     // top = trunc(0 - 7) = -7 (trunc and floor agree at integers; use a
