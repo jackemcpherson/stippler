@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- SHA-256 verification of the u2net.onnx download against a pinned hash, plus
+  a pre-download size ceiling.
+- Timeout (30 s) and response size cap (64 MB) on URL inputs.
+- `CLAUDE.md` agent guidance and a subprocess-level CLI test suite.
+
+### Fixed
+
+- Degenerate inputs (crops that truncate to zero pixels, mattes too sparse to
+  measure a head, models with no inputs/outputs) now fail with clear typed
+  errors instead of crashing with "unexpected error".
+
 ## [0.1.0] - 2026-07-06
 
 Initial release.
