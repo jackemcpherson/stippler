@@ -2,13 +2,14 @@ import { execFile } from "node:child_process";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { beforeAll, describe, expect, it } from "vitest";
 import { makePortrait } from "../helpers";
 
 const runExec = promisify(execFile);
 
-const REPO_ROOT = new URL("../..", import.meta.url).pathname;
+const REPO_ROOT = fileURLToPath(new URL("../..", import.meta.url));
 
 async function cli(args: string[]) {
   try {
