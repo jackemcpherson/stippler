@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -116,5 +116,29 @@ describe("ensureModel", () => {
     const result = await ensureModel({});
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.message).toContain("500");
+  });
+
+  it("aborts an in-flight download and leaves no temp file", async () => {
+    const controller = new AbortController();
+    const body = new ReadableStream<Uint8Array>({
+      pull(c) {
+        c.enqueue(new Uint8Array(1024 * 1024)); // stream forever until aborted
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(body)),
+    );
+    const pending = ensureModel({
+      signal: controller.signal,
+      onProgress: (received) => {
+        if (received > 5_000_000) controller.abort();
+      },
+    });
+    const result = await pending;
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe("MODEL_DOWNLOAD_FAILED");
+    const leftovers = await readdir(join(cacheDir, "stippler")).catch(() => []);
+    expect(leftovers.filter((f) => f.includes(".download-"))).toEqual([]);
   });
 });
