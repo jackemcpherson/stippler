@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { cropFractional, pasteOnWhite } from "../../src/core/raster";
+import { StipplerError } from "../../src/lib/errors";
 import type { RgbImage } from "../../src/types";
+import { solidRgb } from "../helpers";
 
 describe("cropFractional", () => {
   it("crops with truncating pixel bounds", () => {
@@ -15,6 +17,17 @@ describe("cropFractional", () => {
     expect(out.height).toBe(10);
     expect(out.data[0]).toBe(1); // first column is source x=1
     expect(out.data[3 * (out.width - 1)]).toBe(8); // last column is source x=8
+  });
+
+  it("throws StipplerError UNSUPPORTED_IMAGE when the crop region truncates to zero width", () => {
+    // 2×2 image; x0=0.5 -> pixel 1, x1=0.9 -> pixel 1, so w=0.
+    const im = solidRgb(2, 2, 128, 128, 128);
+    expect(() => cropFractional(im, { x0: 0.5, y0: 0, x1: 0.9, y1: 1 })).toThrowError(
+      StipplerError,
+    );
+    expect(() => cropFractional(im, { x0: 0.5, y0: 0, x1: 0.9, y1: 1 })).toThrowError(
+      expect.objectContaining({ code: "UNSUPPORTED_IMAGE" }),
+    );
   });
 });
 
