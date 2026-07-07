@@ -18,11 +18,20 @@ export interface MatteSession {
 export async function createMatteSession(modelPath: string): Promise<MatteSession> {
   let ort: typeof import("onnxruntime-node");
   let session: import("onnxruntime-node").InferenceSession;
+  let inputName: string;
+  let outputName: string;
   try {
     ort = await import("onnxruntime-node");
     session = await ort.InferenceSession.create(modelPath, {
       executionProviders: ["cpu"],
     });
+    const rawInput = session.inputNames[0];
+    const rawOutput = session.outputNames[0];
+    if (rawInput === undefined || rawOutput === undefined) {
+      throw new Error("model has no inputs or outputs — not a u2net.onnx?");
+    }
+    inputName = rawInput;
+    outputName = rawOutput;
   } catch (cause) {
     throw new StipplerError("MATTE_FAILED", `could not load u2net model at ${modelPath}`, {
       cause,
@@ -35,17 +44,9 @@ export async function createMatteSession(modelPath: string): Promise<MatteSessio
         const small = await resizeRgb(im, U2NET_SIZE, U2NET_SIZE);
         const chw = preprocessForU2Net(small);
         const tensor = new ort.Tensor("float32", chw, [1, 3, U2NET_SIZE, U2NET_SIZE]);
-        const inputName = session.inputNames[0];
-        if (inputName === undefined) {
-          throw new Error("model has no inputs");
-        }
         const outputs = await session.run({ [inputName]: tensor });
-        const firstOutput = session.outputNames[0];
-        if (firstOutput === undefined) {
-          throw new Error("model has no outputs");
-        }
         // U2Net emits 7 side outputs; index 0 is the fused [1,1,320,320] map.
-        const pred = outputs[firstOutput]?.data as Float32Array;
+        const pred = outputs[outputName]?.data as Float32Array;
         const rescaled = rescaleMinMax(pred);
 
         // Back to uint8 (truncating, matching numpy astype), then resize to
