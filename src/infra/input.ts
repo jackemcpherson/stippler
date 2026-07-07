@@ -37,6 +37,7 @@ export async function resolveInput(
       }
       const declared = Number(response.headers.get("content-length"));
       if (Number.isFinite(declared) && declared > maxBytes) {
+        await response.body?.cancel().catch(() => {});
         return err(
           new StipplerError(
             "INPUT_FETCH_FAILED",
@@ -49,17 +50,22 @@ export async function resolveInput(
       }
       const chunks: Uint8Array[] = [];
       let received = 0;
+      let overflowed = false;
       for await (const chunk of response.body) {
         received += chunk.length;
         if (received > maxBytes) {
-          return err(
-            new StipplerError(
-              "INPUT_FETCH_FAILED",
-              `response exceeded ${maxBytes} bytes for ${input}`,
-            ),
-          );
+          overflowed = true;
+          break;
         }
         chunks.push(chunk);
+      }
+      if (overflowed) {
+        return err(
+          new StipplerError(
+            "INPUT_FETCH_FAILED",
+            `response exceeded ${maxBytes} bytes for ${input}`,
+          ),
+        );
       }
       return ok(Buffer.concat(chunks));
     } catch (cause) {
