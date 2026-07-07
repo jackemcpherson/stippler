@@ -61,6 +61,10 @@ export function computeHeadFrame(matte: Float64Array, width: number, height: num
   const headW = Math.trunc(percentile(widths, 80));
   const cx = solidCount > 0 ? Math.trunc(xSum / solidCount) : Math.trunc(width / 2);
   const size = Math.trunc(1.75 * headW);
+  if (size < 1) {
+    // Matte too sparse to measure a head — fall back to the full image frame.
+    return { left: 0, top: 0, width, height };
+  }
   const left = cx - Math.floor(size / 2);
   const top = Math.trunc(y0 - 0.1 * size);
   return { left, top, width: size, height: Math.trunc(1.2 * size) };
