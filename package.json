@@ -1,6 +1,6 @@
 {
   "name": "stippler",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "WSJ-hedcut-style stipple portraits from photos: U2Net cutout + weighted Voronoi stippling, output as compact SVG",
   "license": "MIT",
   "author": "Jack McPherson <jackemcpherson@gmail.com>",
