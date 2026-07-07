@@ -48,4 +48,19 @@ describe("renderSvg", () => {
     const svg = renderSvg(points, darkness, "#1a1a1a", 360, 432);
     expect(svg).toContain("M250.6 300.4h.01");
   });
+
+  it("keeps all dot coordinates inside the 360x432 viewBox and emits no NaN", () => {
+    const svg = renderSvg(points, darkness, "#1a1a1a", 360, 432);
+    const matches = [...svg.matchAll(/M(-?[\d.]+) (-?[\d.]+)/g)];
+    expect(matches.length).toBeGreaterThan(0);
+    for (const m of matches) {
+      const x = Number(m[1]);
+      const y = Number(m[2]);
+      expect(x).toBeGreaterThanOrEqual(0);
+      expect(x).toBeLessThanOrEqual(360);
+      expect(y).toBeGreaterThanOrEqual(0);
+      expect(y).toBeLessThanOrEqual(432);
+    }
+    expect(svg).not.toContain("NaN");
+  });
 });
