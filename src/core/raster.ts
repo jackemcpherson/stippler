@@ -1,5 +1,6 @@
 /** Pure raster helpers shared by the cropping, framing, and padding stages. */
 
+import { StipplerError } from "../lib/errors";
 import type { CropBox, RgbImage } from "../types";
 
 /** Fractional crop with Python `int()` truncation of pixel bounds. */
@@ -10,6 +11,12 @@ export function cropFractional(im: RgbImage, box: CropBox): RgbImage {
   const y1 = Math.trunc(box.y1 * im.height);
   const w = x1 - x0;
   const h = y1 - y0;
+  if (w < 1 || h < 1) {
+    throw new StipplerError(
+      "UNSUPPORTED_IMAGE",
+      `crop region is empty at ${im.width}x${im.height} — image too small for the requested crop`,
+    );
+  }
   const out = new Uint8Array(w * h * 3);
   for (let y = 0; y < h; y++) {
     const srcStart = 3 * ((y + y0) * im.width + x0);
