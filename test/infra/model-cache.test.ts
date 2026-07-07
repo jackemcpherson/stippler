@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -50,7 +51,8 @@ describe("ensureModel", () => {
       vi.fn(async () => new Response(big, { headers: { "content-length": String(big.length) } })),
     );
     const progress = vi.fn();
-    const result = await ensureModel({ onProgress: progress });
+    const expected = createHash("sha256").update(big).digest("hex");
+    const result = await ensureModel({ onProgress: progress, expectedSha256: expected });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data).toBe(defaultModelPath());
@@ -60,6 +62,40 @@ describe("ensureModel", () => {
     expect(progress).toHaveBeenCalled();
     const lastCall = progress.mock.calls.at(-1);
     expect(lastCall?.[0]).toBe(big.length);
+  });
+
+  it("rejects a download whose hash does not match the expected value", async () => {
+    const big = new Uint8Array(170_000_001);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(big, { headers: { "content-length": String(big.length) } })),
+    );
+    const result = await ensureModel({ expectedSha256: "0".repeat(64) });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe("MODEL_DOWNLOAD_FAILED");
+      expect(result.error.message).toContain("integrity");
+    }
+    // Cache file must be absent after a failed integrity check
+    await expect(readFile(defaultModelPath())).rejects.toThrow();
+  });
+
+  it("rejects downloads that declare an implausible content-length", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(new Uint8Array(1000), {
+            headers: { "content-length": "999999999999" },
+          }),
+      ),
+    );
+    const result = await ensureModel({});
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe("MODEL_DOWNLOAD_FAILED");
+      expect(result.error.message).toContain("implausible");
+    }
   });
 
   it("rejects truncated downloads and cleans up", async () => {
