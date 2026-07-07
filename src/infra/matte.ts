@@ -28,6 +28,7 @@ export async function createMatteSession(modelPath: string): Promise<MatteSessio
     const rawInput = session.inputNames[0];
     const rawOutput = session.outputNames[0];
     if (rawInput === undefined || rawOutput === undefined) {
+      await session.release().catch(() => {});
       throw new Error("model has no inputs or outputs — not a u2net.onnx?");
     }
     inputName = rawInput;
