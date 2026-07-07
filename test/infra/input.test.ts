@@ -58,6 +58,52 @@ describe("resolveInput", () => {
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.code).toBe("INPUT_FETCH_FAILED");
   });
+
+  it("returns INPUT_FETCH_FAILED on timeout", async () => {
+    const fetchSpy = vi.fn(async (_url: string, _init?: RequestInit) => {
+      throw new DOMException("The operation timed out", "TimeoutError");
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+    const result = await resolveInput("https://example.com/x.jpg", { timeoutMs: 5 });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe("INPUT_FETCH_FAILED");
+    expect(fetchSpy.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("returns INPUT_FETCH_FAILED when content-length exceeds maxBytes", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(new Uint8Array(10), { headers: { "content-length": "100" } })),
+    );
+    const result = await resolveInput("https://example.com/big.jpg", { maxBytes: 50 });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe("INPUT_FETCH_FAILED");
+      expect(result.error.message).toContain("too large");
+    }
+  });
+
+  it("returns INPUT_FETCH_FAILED when streamed body exceeds maxBytes", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new Uint8Array(60));
+            controller.enqueue(new Uint8Array(60));
+            controller.close();
+          },
+        });
+        return new Response(stream);
+      }),
+    );
+    const result = await resolveInput("https://example.com/big.jpg", { maxBytes: 50 });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe("INPUT_FETCH_FAILED");
+      expect(result.error.message).toContain("exceeded");
+    }
+  });
 });
 
 describe("inputStem", () => {
