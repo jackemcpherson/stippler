@@ -22,7 +22,8 @@ npm install -g stippler   # or: npx stippler photo.jpg
 Requires Node 20+. `sharp` and `onnxruntime-node` ship native binaries for
 macOS (arm64/x64), Linux (x64/arm64 glibc), and Windows x64; Alpine/musl is
 unsupported. On first run with background removal, the u2net model (~176 MB)
-downloads once to `~/.cache/stippler/u2net.onnx`.
+downloads once to `~/.cache/stippler/u2net.onnx`. The download is verified
+against a pinned SHA-256 before being cached.
 
 ## Usage
 

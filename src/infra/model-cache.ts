@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { mkdir, rename, stat, unlink } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -11,6 +12,12 @@ const MODEL_URL = "https://github.com/danielgatis/rembg/releases/download/v0.0.0
 
 /** Sanity floor for a complete u2net.onnx (actual size ~176 MB). */
 const MODEL_SIZE_MIN = 170_000_000;
+
+/** Ceiling on the declared download size — reject absurd content-length early. */
+const MODEL_SIZE_MAX = 200_000_000;
+
+/** SHA-256 of the genuine u2net.onnx release asset. */
+const MODEL_SHA256 = "8d10d2f3bb75ae3b6d527c77944fc5e7dcd94b29809d47a739a7a728a912b491";
 
 /** Default cache location: `$XDG_CACHE_HOME/stippler/u2net.onnx`. */
 export function defaultModelPath(): string {
@@ -29,15 +36,26 @@ async function fileSize(path: string): Promise<number | undefined> {
 /**
  * Resolve a usable u2net.onnx path, downloading to the cache on first use.
  *
- * An explicit `modelPath` is trusted as-is and never triggers a download;
- * the default cache path is (re-)downloaded when missing or truncated.
+ * An explicit `modelPath` is trusted as-is and never triggers a download or
+ * hash verification.
+ *
+ * An existing cache file ≥ `MODEL_SIZE_MIN` is trusted without re-hashing.
+ * This is deliberate: the SHA-256 is verified once at download time, and
+ * hashing a 176 MB file on every CLI invocation costs real startup time.
+ *
+ * Fresh downloads are verified against a pinned SHA-256 before the temp file
+ * is renamed into the cache. The temp file is always unlinked on failure.
  */
 export async function ensureModel(opts: {
   modelPath?: string | undefined;
   onProgress?: (receivedBytes: number, totalBytes: number | null) => void;
   /** Aborts an in-flight download and cleans up its temp file. */
   signal?: AbortSignal | undefined;
+  /** Override the pinned model hash — for tests only. */
+  expectedSha256?: string | undefined;
 }): Promise<Result<string, StipplerError>> {
+  const expectedSha256 = opts.expectedSha256 ?? MODEL_SHA256;
+
   if (opts.modelPath !== undefined) {
     const size = await fileSize(opts.modelPath);
     if (size === undefined) {
@@ -71,10 +89,24 @@ export async function ensureModel(opts: {
     }
     const contentLength = response.headers.get("content-length");
     const total = contentLength === null ? null : Number(contentLength);
+    if (total !== null && (!Number.isFinite(total) || total > MODEL_SIZE_MAX)) {
+      return err(
+        new StipplerError(
+          "MODEL_DOWNLOAD_FAILED",
+          `model download declared implausible size (${contentLength} bytes)`,
+        ),
+      );
+    }
     let received = 0;
+    const hash = createHash("sha256");
     const progress = new Transform({
       transform(chunk: Buffer, _encoding, callback) {
         received += chunk.length;
+        if (received > MODEL_SIZE_MAX) {
+          callback(new Error("model download exceeded size ceiling"));
+          return;
+        }
+        hash.update(chunk);
         opts.onProgress?.(received, total);
         callback(null, chunk);
       },
@@ -92,6 +124,16 @@ export async function ensureModel(opts: {
         new StipplerError(
           "MODEL_DOWNLOAD_FAILED",
           `model download truncated (${downloaded ?? 0} bytes)`,
+        ),
+      );
+    }
+    const digest = hash.digest("hex");
+    if (digest !== expectedSha256) {
+      await unlink(temp).catch(() => {});
+      return err(
+        new StipplerError(
+          "MODEL_DOWNLOAD_FAILED",
+          `model download failed integrity check (sha256 ${digest})`,
         ),
       );
     }
