@@ -1,4 +1,4 @@
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 import { StipplerError } from "../lib/errors";
 import { CANVAS_HEIGHT, CANVAS_WIDTH, type GrayImage, type RgbImage } from "../types";
 
@@ -32,7 +32,7 @@ export async function decodeToRgb(buffer: Buffer): Promise<RgbImage> {
  * extractChannel(0) forces the output back to one channel, and the guard
  * catches regressions of that workaround.
  */
-async function toGray(pipeline: sharp.Sharp, what: string): Promise<GrayImage> {
+async function toGray(pipeline: Sharp, what: string): Promise<GrayImage> {
   const { data, info } = await pipeline
     .extractChannel(0)
     .raw()
