@@ -52,7 +52,7 @@
     "d3-delaunay": "^6.0.4",
     "onnxruntime-node": "^1.20.0",
     "picocolors": "^1.1.1",
-    "sharp": "^0.34.0",
+    "sharp": "^0.35.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
